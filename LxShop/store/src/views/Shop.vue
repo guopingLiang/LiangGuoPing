@@ -1,35 +1,42 @@
 <template>
   <div class="cart">
     <van-nav-bar title="购物车" />
-    <!-- 商品列表 -->
-    <van-checkbox
-      v-for="(item,index) in goods"
-      :key="index"
-      v-model="cart.info[item.id].ischk"
-      :label-disabled="true"
-    >
-      <van-card
-        :num="cart.info[item.id].count"
-        :price="item.price"
-        :title="item.goods_name"
-        :thumb="item.image"
+    <div v-if="goods.length >0">
+      <!-- 商品列表 -->
+      <van-checkbox
+        v-for="(item,index) in goods"
+        :key="index"
+        v-model="cart.info[item.id].ischk"
+        :label-disabled="true"
       >
-        <!-- 购买数量步进器 -->
-        <van-stepper slot="num" v-model="cart.info[item.id].count" />
-        <!-- 自定义右下角该商品总价 -->
-        <van-tag
-          type="warning"
-          slot="footer"
-        >小计:￥{{(cart.info[item.id].count*item.price).toFixed(2)}}</van-tag>
-      </van-card>
-    </van-checkbox>
-    <!-- 提交订单 -->
-    <van-submit-bar :price="totalPrice" button-text="结算">
+        <van-card
+          :num="cart.info[item.id].count"
+          :price="item.price"
+          :title="item.goods_name"
+          :thumb="item.image"
+        >
+          <!-- 购买数量步进器 -->
+          <van-stepper slot="num" v-model="cart.info[item.id].count" />
+          <!-- 自定义右下角该商品总价 -->
+          <van-tag
+            type="warning"
+            slot="footer"
+          >小计:￥{{(cart.info[item.id].count*item.price).toFixed(2)}}</van-tag>
+        </van-card>
+      </van-checkbox>
+      <!-- 提交订单 -->
+      <van-submit-bar :price="totalPrice" button-text="结算">
         <van-checkbox v-model="chkAll">全选</van-checkbox>
-  <span slot="tip">
-    你的收货地址不支持同城送, <span>修改地址</span>
-  </span>
-    </van-submit-bar>
+        <span slot="tip">
+          你的收货地址不支持同城送,
+          <span>修改地址</span>
+        </span>
+      </van-submit-bar>
+    </div>
+    <div v-else>
+      购物车是空的!请去添加宝贝噢!
+      <van-button type="primary" to="/">去首页</van-button>
+    </div>
   </div>
 </template>
 
