@@ -265,5 +265,121 @@ app.post('/api/v1/login', (req, res) => {
     })
 })
 
+// 下单接口
+app.post('/api/v1/orders', (req, res) => {
+    // 0. 先判断令牌，并且从令牌中解析出用户ID来
+    // 获取令牌（令牌是在协议头的 Authorzation )
+    let token = req.headers.authorization
+    if (token === undefined) {
+        res.json({
+            'ok': 0,
+            'error': '令牌不存在！'
+        })
+        return
+    }
+    // 要去掉令牌前7个字符（Bearer )
+    token = token.substring(7)
+    // 解析用户ID
+    try {
+        // 解析令牌并从令牌中取出 id 属性，并重命名为 userId
+        var {
+            id: userId
+        } = jsonwebtoken.verify(token, secret)
+    } catch (err) {
+        res.json({
+            'ok': 0,
+            'error': '无效的令牌！'
+        })
+        return
+    }
+    // 1. 接收数据
+    let address_id = req.body.address_id
+    let cart = req.body.cart
+    let pay_method = req.body.pay_method
+    // 2. 判断库存量
+    // 从购物车中提取出所有商品的 id
+    let goodsId = [] // 保存所有的商品ID
+    cart.forEach(v => {
+        goodsId.push(v.goods_id)
+    })
+    goodsId = goodsId.join(',') // 转成字符串 1,2,3,4,5
+    // 根据 ID 取库存量
+    let sql = `SELECT id,stock,price FROM shop_goods WHERE id IN(${goodsId})`
+    db.query(sql, (err, data) => {
+        /*
+            data 的数据结构：
+        [
+            {
+                "id": 1,
+                "stock": 430
+            },
+            {
+                "id": 4,
+                "stock": 543
+            },
+            {
+                "id": 5,
+                "stock": 7656
+            },
+            {
+                "id": 6,
+                "stock": 543
+            }
+        ]*/
+        // 循环购物车判断库存量 并 计算总价格
+        let totalPrice = 0 // 总价
+        for (let i = 0; i < cart.length; i++) {
+            // 用购物车中商品的ID 到 data 中找 id 相同的对象
+            let goodsStock = data.find(v => {
+                return v.id === cart[i].goods_id
+            })
+            // 判断库存量是否不足
+            if (goodsStock.stock < cart[i].buy_count) {
+                res.json({
+                    'ok': 0,
+                    'error': '库存量不足！不足商品的ID=' + cart[i].goods_id
+                })
+                return
+            } else {
+                totalPrice += cart[i].buy_count * goodsStock.price
+            }
+        }
+        // 下订单01  -  先在订单基本信息表中插入一条记录
+        // 根据收货地址 ID 把收货信息取出来
+        db.query(`SELECT name shr_name,
+                        mobile shr_mobile,
+                        province shr_province,
+                        city shr_city,
+                        area shr_area,
+                        address shr_address,
+                        zipcode shr_zipcode 
+                        FROM shop_addresses WHERE id = ?`, address_id, (err, data) => {
+            // 先构造订单表中的数据（20位订单号）
+            let orderSN = new Date().getTime().toString() + Math.random().toString().substring(2, 9)
+            let orderData = {
+                user_id: userId, // 从令牌中解析获取
+                order_sn: orderSN, // 生成一个订单号：生成 20 位长的唯一的字符串 （当前的毫秒时间戳 + 随机数）
+                addtime: parseInt(new Date().getTime() / 1000), // 当前时间戳，单位：秒
+                pay_method: pay_method,
+                status: 0, // 订单状态 
+                ...data[0],
+                total_price: totalPrice
+            }
+            // 插入到数据库中
+            db.query('INSERT INTO shop_orders SET ?', orderData, (err, data) => {
+                if (err) {
+                    res.json({
+                        'ok': 0,
+                        'error': err
+                    })
+                } else {
+                    res.json(data)
+                }
+            })
+
+        })
+    })
+})
+
 // 监听端口启动服务
 app.listen(9999, () => console.log('成功!监听:127.0.0.1:9999'))
